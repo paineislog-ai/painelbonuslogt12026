@@ -62,17 +62,32 @@ def is_lider_org(item: str) -> bool:
     k = norm_txt(item)
     return ("LIDERANCA" in k) and ("ORGANIZACAO" in k)
 
+def is_producao_item(item: str) -> bool:
+    """
+    Detecta itens de Produção mesmo com variações:
+    PRODUÇÃO / PRODUCAO / PRDÇÃO / PRDCAO / PRD / PROD.
+    """
+    k = up(item)
+    return ("PRODU" in k) or ("PRD" in k) or k.startswith("PROD")
+
+def extrair_cidade_do_item(item: str, cidades_norm: list) -> str | None:
+    """Acha a cidade dentro do texto do item (ex: 'PRDÇÃO SÃO LUIS')."""
+    k = up(item)
+    for c in cidades_norm:
+        if c and c in k:
+            return c
+    return None
+
 # ===================== PARÂMETROS (QUALIDADE GESTÃO) =====================
-# "media_simples" -> média das cidades; "por_cidade" -> proporcional de cidades que bateram
-QUALIDADE_GESTAO_METODO = "media_simples"  # troque para "por_cidade" se quiser
+# Ajustado para o seu cenário: Qualidade da gestão por CIDADE (proporção de cidades que bateram)
+QUALIDADE_GESTAO_METODO = "por_cidade"
 
 META_ERROS_TOTAIS_GESTAO = 0.035  # 3,5%
 META_ERROS_GG_GESTAO = 0.015      # 1,5%
 
-# ===================== MAPA DE SUPERVISORES (NORMALIZADO) =====================
-# Pesos usados para RATEAR o indicador "Produção" (40%) por cidade.
-# Marta: 5 cidades => 0.2 cada
-# Eleilson: 3 cidades => 0.333333... cada
+# ===================== MAPA DE RESPONSABILIDADE (RATEIO PRODUÇÃO) =====================
+# Aqui é usado APENAS quando o item de produção for "genérico" (sem cidade no nome).
+# Se no PESOS já tiver "PRDÇÃO SÃO LUIS 8%" etc, o código usa o item e ignora este rateio.
 _SUPERVISORES_CIDADES_RAW = {
     "MARTA OLIVEIRA COSTA RAMOS": {
         "SÃO LUIS": 0.2,
@@ -104,7 +119,7 @@ except Exception as e:
     st.error(f"Erro ao carregar JSONs: {e}")
     st.stop()
 
-MESES = ["TRIMESTRE", "JANEIRO", "FEVEREIRO", "MARÇO"]
+MESES = ["TRIMESTRE", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
 filtro_mes = st.radio("📅 Selecione o mês:", MESES, horizontal=True)
 
 def ler_planilha(mes: str) -> pd.DataFrame:
@@ -117,17 +132,16 @@ def ler_planilha(mes: str) -> pd.DataFrame:
         st.stop()
     return pd.read_excel(sorted(candidatos)[0], sheet_name=mes)
 
-# ===================== REGRAS (QUALIDADE % POR CIDADE - VISTORIADOR) =====================
+# ===================== REGRAS (QUALIDADE VISTORIADOR) =====================
 LIMITES_QUALIDADE_POR_CIDADE = {
     up("AÇAILÂNDIA"): {"total": 0.035, "graves": 0.015},
-    up("CAROLINA MARANHÃO"): {"total": 0.035, "graves": 0.015},
-    up("PRESIDENTE DUTRA"): {"total": 0.035, "graves": 0.015},
+    up("CAROLINA MARANHÃO"): {"total": 0.05, "graves": 0.02},
+    up("PRESIDENTE DUTRA"): {"total": 0.05, "graves": 0.02},
     up("SÃO LUÍS"): {"total": 0.035, "graves": 0.015},
     up("SAO LUIS"): {"total": 0.035, "graves": 0.015},
     up("SÃO LUIS"): {"total": 0.035, "graves": 0.015},
-    up("TIMON"): {"total": 0.035, "graves": 0.015},
+    up("TIMON"): {"total": 0.05, "graves": 0.02},
 }
-
 LIMITE_TOTAL_PADRAO = 0.035
 LIMITE_GRAVES_PADRAO = 0.015
 
@@ -139,10 +153,6 @@ def limites_qualidade(cidade: str):
     return LIMITE_TOTAL_PADRAO, LIMITE_GRAVES_PADRAO
 
 def pct_qualidade_vistoriador(erros_total_frac: float, erros_graves_frac: float, limite_total: float, limite_graves: float) -> float:
-    """
-    Retorna 0.0, 0.5 ou 1.0 para o indicador 'Qualidade' do Vistoriador
-    usando limites por cidade (frações).
-    """
     et = 0.0 if pd.isna(erros_total_frac) else float(erros_total_frac)
     eg = 0.0 if pd.isna(erros_graves_frac) else float(erros_graves_frac)
 
@@ -156,96 +166,62 @@ def pct_qualidade_vistoriador(erros_total_frac: float, erros_graves_frac: float,
     return 0.0
 
 # ===================== REGRAS (QUALIDADE SUPERVISOR/GERENTE) =====================
-def calc_qualidade_gestao(nome_norm: str,
-                          cidades_resp: list,
+def calc_qualidade_gestao(cidades_resp: list,
                           total_por_cidade: dict,
                           gg_por_cidade: dict,
                           meta_total: float = META_ERROS_TOTAIS_GESTAO,
                           meta_gg: float = META_ERROS_GG_GESTAO,
                           metodo: str = QUALIDADE_GESTAO_METODO):
-    """
-    Retorna:
-      - frac_total (0..1): parte do subindicador Erros Totais (10%)
-      - frac_gg (0..1): parte do subindicador Erros GG (10%)
-      - detalhes_perda (lista str): descrições do que não bateu
-    """
     detalhes = []
 
-    vals_total, vals_gg = [], []
-    faltando_total, faltando_gg = [], []
-
-    for c in cidades_resp:
-        if c in total_por_cidade:
-            vals_total.append(float(total_por_cidade[c]))
-        else:
-            faltando_total.append(c)
-
-        if c in gg_por_cidade:
-            vals_gg.append(float(gg_por_cidade[c]))
-        else:
-            faltando_gg.append(c)
-
-    # sem dados -> não paga (evita pagar "no escuro")
-    if not vals_total and not vals_gg:
-        detalhes.append("Qualidade (gestão) — sem dados por cidade no JSON do mês")
-        return 0.0, 0.0, detalhes
-
-    if metodo == "media_simples":
-        avg_total = (sum(vals_total) / len(vals_total)) if vals_total else None
-        avg_gg = (sum(vals_gg) / len(vals_gg)) if vals_gg else None
-
-        total_ok = (avg_total is not None) and (avg_total <= meta_total)
-        gg_ok = (avg_gg is not None) and (avg_gg <= meta_gg)
-
-        frac_total = 1.0 if total_ok else 0.0
-        frac_gg = 1.0 if gg_ok else 0.0
-
-        if not total_ok:
-            detalhes.append(f"Qualidade — Erros Totais: média {fmt_pct(avg_total)} (meta {fmt_pct(meta_total)})")
-        if not gg_ok:
-            detalhes.append(f"Qualidade — Erros GG: média {fmt_pct(avg_gg)} (meta {fmt_pct(meta_gg)})")
-
-        if faltando_total:
-            detalhes.append("Qualidade — sem dado Erros Totais em: " + ", ".join([c.title() for c in faltando_total]))
-        if faltando_gg:
-            detalhes.append("Qualidade — sem dado Erros GG em: " + ", ".join([c.title() for c in faltando_gg]))
-
-        return frac_total, frac_gg, detalhes
-
-    # metodo == "por_cidade"
+    # garante só cidades que existem no JSON do mês
     cidades_total = [c for c in cidades_resp if c in total_por_cidade]
     cidades_gg = [c for c in cidades_resp if c in gg_por_cidade]
 
-    if not cidades_total:
-        frac_total = 0.0
-        detalhes.append("Qualidade — Erros Totais: sem dados por cidade")
-    else:
+    if metodo == "media_simples":
+        vals_total = [float(total_por_cidade[c]) for c in cidades_total]
+        vals_gg = [float(gg_por_cidade[c]) for c in cidades_gg]
+        if not vals_total and not vals_gg:
+            return 0.0, 0.0, ["Qualidade (gestão) — sem dados por cidade no JSON do mês"]
+
+        avg_total = (sum(vals_total) / len(vals_total)) if vals_total else None
+        avg_gg = (sum(vals_gg) / len(vals_gg)) if vals_gg else None
+
+        frac_total = 1.0 if (avg_total is not None and avg_total <= meta_total) else 0.0
+        frac_gg = 1.0 if (avg_gg is not None and avg_gg <= meta_gg) else 0.0
+
+        if frac_total < 1.0:
+            detalhes.append(f"Qualidade — Erros Totais: média {fmt_pct(avg_total)} (meta {fmt_pct(meta_total)})")
+        if frac_gg < 1.0:
+            detalhes.append(f"Qualidade — Erros GG: média {fmt_pct(avg_gg)} (meta {fmt_pct(meta_gg)})")
+
+        return frac_total, frac_gg, detalhes
+
+    # por_cidade
+    if not cidades_total and not cidades_gg:
+        return 0.0, 0.0, ["Qualidade (gestão) — sem dados por cidade no JSON do mês"]
+
+    # totais
+    if cidades_total:
         ok_total = [c for c in cidades_total if float(total_por_cidade[c]) <= meta_total]
         nok_total = [c for c in cidades_total if c not in ok_total]
-        frac_total = (len(ok_total) / len(cidades_total)) if cidades_total else 0.0
+        frac_total = len(ok_total) / len(cidades_total)
         if nok_total:
-            detalhes.append(
-                "Qualidade — Erros Totais (não bateu): " + ", ".join([c.title() for c in nok_total]) +
-                f" (meta {fmt_pct(meta_total)})"
-            )
-
-    if not cidades_gg:
-        frac_gg = 0.0
-        detalhes.append("Qualidade — Erros GG: sem dados por cidade")
+            detalhes.append("Qualidade — Erros Totais (não bateu): " + ", ".join([c.title() for c in nok_total]))
     else:
+        frac_total = 0.0
+        detalhes.append("Qualidade — Erros Totais: sem dados por cidade")
+
+    # gg
+    if cidades_gg:
         ok_gg = [c for c in cidades_gg if float(gg_por_cidade[c]) <= meta_gg]
         nok_gg = [c for c in cidades_gg if c not in ok_gg]
-        frac_gg = (len(ok_gg) / len(cidades_gg)) if cidades_gg else 0.0
+        frac_gg = len(ok_gg) / len(cidades_gg)
         if nok_gg:
-            detalhes.append(
-                "Qualidade — Erros GG (não bateu): " + ", ".join([c.title() for c in nok_gg]) +
-                f" (meta {fmt_pct(meta_gg)})"
-            )
-
-    if faltando_total:
-        detalhes.append("Qualidade — sem dado Erros Totais em: " + ", ".join([c.title() for c in faltando_total]))
-    if faltando_gg:
-        detalhes.append("Qualidade — sem dado Erros GG em: " + ", ".join([c.title() for c in faltando_gg]))
+            detalhes.append("Qualidade — Erros GG (não bateu): " + ", ".join([c.title() for c in nok_gg]))
+    else:
+        frac_gg = 0.0
+        detalhes.append("Qualidade — Erros GG: sem dados por cidade")
 
     return float(frac_total), float(frac_gg), detalhes
 
@@ -261,11 +237,11 @@ def elegivel(valor_meta, obs):
 def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
     ind_mes_raw = INDICADORES[nome_mes]
 
-    # flags e produção por cidade
+    # flags e produção por cidade (boolean de bateu)
     ind_flags = {up(k): v for k, v in ind_mes_raw.items() if k != "producao_por_cidade"}
-    prod_cid_norm = {up(k): v for k, v in ind_mes_raw.get("producao_por_cidade", {}).items()}
+    prod_cid_norm = {up(k): bool(v) for k, v in ind_mes_raw.get("producao_por_cidade", {}).items()}
 
-    # qualidade por cidade (para Supervisor/Gerente)
+    # qualidade por cidade (percentuais)
     qual_total_cid_norm = {up(k): pct_safe(v) for k, v in ind_mes_raw.get("qualidade_total_por_cidade", {}).items()}
     qual_gg_cid_norm = {up(k): pct_safe(v) for k, v in ind_mes_raw.get("qualidade_gg_por_cidade", {}).items()}
 
@@ -300,9 +276,21 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
             parcela = total_func * float(peso)
             item_norm = up(item)
 
-            # --- PRODUÇÃO (RATEADA POR CIDADE PARA SUPERVISOR) ---
-            if item_norm.startswith(up("Produção")):
-                if func == up("SUPERVISOR") and nome in SUPERVISORES_CIDADES:
+            # ------------------- PRODUÇÃO -------------------
+            if is_producao_item(item):
+                # Se o PESOS já tem a cidade no nome (ex: "PRDÇÃO SÃO LUIS 8%"), calcula direto.
+                cid_no_item = extrair_cidade_do_item(item, list(prod_cid_norm.keys()))
+                if cid_no_item:
+                    bateu = prod_cid_norm.get(cid_no_item, True)
+                    if bateu:
+                        recebido += parcela
+                    else:
+                        perdas += parcela
+                        perdeu_itens.append("Produção – " + cid_no_item.title())
+                    continue
+
+                # Se não tem cidade no item, usa rateio por responsabilidade
+                if func in [up("SUPERVISOR"), up("GERENTE")] and nome in SUPERVISORES_CIDADES:
                     perdas_cids = []
                     base_soma = sum(SUPERVISORES_CIDADES[nome].values()) or 1.0
 
@@ -318,19 +306,21 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
 
                     if perdas_cids:
                         perdeu_itens.append("Produção – " + ", ".join(perdas_cids))
+                    continue
+
+                # fallback: usa cidade do colaborador
+                bateu_prod = prod_cid_norm.get(cidade, True)
+                if bateu_prod:
+                    recebido += parcela
                 else:
-                    bateu_prod = prod_cid_norm.get(cidade, True)
-                    if bateu_prod:
-                        recebido += parcela
-                    else:
-                        perdas += parcela
-                        cidade_legivel = (str(row.get("CIDADE", "")).title() if row.get("CIDADE", "") else "Cidade não informada")
-                        perdeu_itens.append("Produção – " + cidade_legivel)
+                    perdas += parcela
+                    cidade_legivel = (str(row.get("CIDADE", "")).title() if row.get("CIDADE", "") else "Cidade não informada")
+                    perdeu_itens.append("Produção – " + cidade_legivel)
                 continue
 
-            # --- QUALIDADE ---
+            # ------------------- QUALIDADE -------------------
             if item_norm == up("Qualidade"):
-                # VISTORIADOR: 0/50/100 por limites da cidade
+                # Vistoriador: 0/50/100 por limites da cidade
                 if func == up("VISTORIADOR"):
                     et_frac = pct_safe(row.get("ERROS TOTAL", 0))
                     eg_frac = pct_safe(row.get("ERROS GG", 0))
@@ -355,14 +345,14 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
                         )
                     continue
 
-                # SUPERVISOR/GERENTE: qualidade por cidades (10% tot + 10% gg)
+                # Supervisor/Gerente: 20% dividido em 10% totais + 10% gg, por cidade
                 if func in [up("SUPERVISOR"), up("GERENTE")]:
                     cidades_resp = list(SUPERVISORES_CIDADES.get(nome, {}).keys())
                     if not cidades_resp:
-                        cidades_resp = [cidade] if cidade else []
+                        # fallback: tenta todas do JSON, ou a cidade do colaborador
+                        cidades_resp = list(qual_total_cid_norm.keys()) or ([cidade] if cidade else [])
 
                     frac_total, frac_gg, detalhes = calc_qualidade_gestao(
-                        nome_norm=nome,
                         cidades_resp=cidades_resp,
                         total_por_cidade=qual_total_cid_norm,
                         gg_por_cidade=qual_gg_cid_norm,
@@ -384,7 +374,7 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
 
                     continue
 
-                # outras funções: flag empresa-wide
+                # Outras funções: empresa-wide
                 if flag("qualidade", True):
                     recebido += parcela
                 else:
@@ -392,7 +382,7 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
                     perdeu_itens.append("Qualidade")
                 continue
 
-            # --- LUCRATIVIDADE ---
+            # ------------------- LUCRATIVIDADE -------------------
             if item_norm == up("Lucratividade"):
                 if flag("financeiro", True):
                     recebido += parcela
@@ -401,7 +391,7 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
                     perdeu_itens.append("Lucratividade")
                 continue
 
-            # --- ORGANIZAÇÃO DA LOJA 5s ---
+            # ------------------- ORGANIZAÇÃO DA LOJA -------------------
             if is_org_loja(item):
                 if flag("organizacao_da_loja", True):
                     recebido += parcela
@@ -410,7 +400,7 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
                     perdeu_itens.append("Organização da Loja 5s")
                 continue
 
-            # --- LIDERANÇA & ORGANIZAÇÃO ---
+            # ------------------- LIDERANÇA & ORGANIZAÇÃO -------------------
             if is_lider_org(item):
                 if flag("Liderança & Organização", True):
                     recebido += parcela
@@ -419,7 +409,7 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
                     perdeu_itens.append("Liderança & Organização")
                 continue
 
-            # --- DEMAIS METAS: CONSIDERA BATIDAS ---
+            # ------------------- DEMAIS METAS: CONSIDERA BATIDAS -------------------
             recebido += parcela
 
         meta = total_func
@@ -436,16 +426,16 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
 # ===================== LEITURA (TRIMESTRE OU MÊS) =====================
 if filtro_mes == "TRIMESTRE":
     try:
-        df_o, df_n, df_d = [ler_planilha(m) for m in ["JANEIRO", "FEVEREIRO", "MARÇO"]]
-        st.success("✅ Planilhas carregadas com sucesso: JANEIRO, FEVEREIRO e MARÇO!")
+        df_o, df_n, df_d = [ler_planilha(m) for m in ["OUTUBRO", "NOVEMBRO", "DEZEMBRO"]]
+        st.success("✅ Planilhas carregadas com sucesso: OUTUBRO, NOVEMBRO e DEZEMBRO!")
     except Exception as e:
         st.error(f"Erro ao ler a planilha: {e}")
         st.stop()
 
     dados_full = pd.concat([
-        calcula_mes(df_o, "JANEIRO"),
-        calcula_mes(df_n, "FEVEREIRO"),
-        calcula_mes(df_d, "MARÇO")
+        calcula_mes(df_o, "OUTUBRO"),
+        calcula_mes(df_n, "NOVEMBRO"),
+        calcula_mes(df_d, "DEZEMBRO")
     ], ignore_index=True)
 
     group_cols = ["CIDADE", "NOME", "FUNÇÃO", "DATA DE ADMISSÃO", "TEMPO DE CASA"]
@@ -567,4 +557,3 @@ for idx, row in dados_view.iterrows():
             st.caption(f"🗒️ {obs_txt}")
         if perdidos_txt and "100%" not in perdidos_txt:
             st.caption(f"🔻 Indicadores não entregues: {perdidos_txt}")
-
