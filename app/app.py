@@ -122,11 +122,11 @@ def ler_planilha(mes: str) -> pd.DataFrame:
 # (mantido para vistoriador, como já está no seu projeto)
 LIMITES_QUALIDADE_POR_CIDADE = {
     up("AÇAILÂNDIA"): {"total": 0.035, "graves": 0.015},
-    up("CAROLINA MARANHÃO"): {"total": 0.05, "graves": 0.02},
-    up("PRESIDENTE DUTRA"): {"total": 0.05, "graves": 0.02},
+    up("CAROLINA MARANHÃO"): {"total": 0.035, "graves": 0.015},
+    up("PRESIDENTE DUTRA"): {"total": 0.035, "graves": 0.015},
     up("SÃO LUÍS"): {"total": 0.035, "graves": 0.015},
     up("SAO LUIS"): {"total": 0.035, "graves": 0.015},  # fallback sem acento
-    up("TIMON"): {"total": 0.05, "graves": 0.02},
+    up("TIMON"): {"total": 0.035, "graves": 0.015},
 }
 
 LIMITE_TOTAL_PADRAO = 0.035
@@ -589,3 +589,4 @@ for idx, row in dados_view.iterrows():
         if perdidos_txt and "100%" not in perdidos_txt:
 
             st.caption(f"🔻 Indicadores não entregues: {perdidos_txt}")
+
