@@ -1,0 +1,83 @@
+{
+  "JANEIRO": {
+    "financeiro": true,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": false,
+      "TIMON": true,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": false,
+      "CAROLINA": true
+    },
+    "qualidade_total_por_cidade": {
+      "SÃO LUIS": 0.035,
+      "AÇAILÂNDIA": 0.048,
+      "TIMON": 0.058,
+      "PRESIDENTE DUTRA": 0.034,
+      "CAROLINA": 0.029
+    },
+    "qualidade_gg_por_cidade": {
+      "SÃO LUIS": 0.016,
+      "AÇAILÂNDIA": 0.023,
+      "TIMON": 0.023,
+      "PRESIDENTE DUTRA": 0.018,
+      "CAROLINA": 0.022
+    }
+  },
+  "FEVEREIRO": {
+    "financeiro": false,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": true,
+      "TIMON": true,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": true,
+      "CAROLINA": true
+    },
+    "qualidade_total_por_cidade": {
+      "SÃO LUIS": 0.035,
+      "AÇAILÂNDIA": 0.035,
+      "TIMON": 0.035,
+      "PRESIDENTE DUTRA": 0.035,
+      "CAROLINA": 0.035
+    },
+    "qualidade_gg_por_cidade": {
+      "SÃO LUIS": 0.015,
+      "AÇAILÂNDIA": 0.015,
+      "TIMON": 0.015,
+      "PRESIDENTE DUTRA": 0.015,
+      "CAROLINA": 0.015
+    }
+  },
+  "MARÇO": {
+    "financeiro": true,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": true,
+      "TIMON": true,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": true,
+      "CAROLINA": true
+    },
+    "qualidade_total_por_cidade": {
+      "SÃO LUIS": 0.035,
+      "AÇAILÂNDIA": 0.035,
+      "TIMON": 0.035,
+      "PRESIDENTE DUTRA": 0.035,
+      "CAROLINA": 0.035
+    },
+    "qualidade_gg_por_cidade": {
+      "SÃO LUIS": 0.015,
+      "AÇAILÂNDIA": 0.015,
+      "TIMON": 0.015,
+      "PRESIDENTE DUTRA": 0.015,
+      "CAROLINA": 0.015
+    }
+  }
+}
