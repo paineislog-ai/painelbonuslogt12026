@@ -104,7 +104,7 @@ except Exception as e:
     st.error(f"Erro ao carregar JSONs: {e}")
     st.stop()
 
-MESES = ["TRIMESTRE", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
+MESES = ["TRIMESTRE", "JANEIRO", "FEVEREIRO", "MARÇO"]
 filtro_mes = st.radio("📅 Selecione o mês:", MESES, horizontal=True)
 
 def ler_planilha(mes: str) -> pd.DataFrame:
@@ -120,12 +120,12 @@ def ler_planilha(mes: str) -> pd.DataFrame:
 # ===================== REGRAS (QUALIDADE % POR CIDADE - VISTORIADOR) =====================
 LIMITES_QUALIDADE_POR_CIDADE = {
     up("AÇAILÂNDIA"): {"total": 0.035, "graves": 0.015},
-    up("CAROLINA MARANHÃO"): {"total": 0.05, "graves": 0.02},
-    up("PRESIDENTE DUTRA"): {"total": 0.05, "graves": 0.02},
+    up("CAROLINA MARANHÃO"): {"total": 0.035, "graves": 0.015},
+    up("PRESIDENTE DUTRA"): {"total": 0.035, "graves": 0.015},
     up("SÃO LUÍS"): {"total": 0.035, "graves": 0.015},
     up("SAO LUIS"): {"total": 0.035, "graves": 0.015},
     up("SÃO LUIS"): {"total": 0.035, "graves": 0.015},
-    up("TIMON"): {"total": 0.05, "graves": 0.02},
+    up("TIMON"): {"total": 0.035, "graves": 0.015},
 }
 
 LIMITE_TOTAL_PADRAO = 0.035
@@ -436,16 +436,16 @@ def calcula_mes(df_mes: pd.DataFrame, nome_mes: str) -> pd.DataFrame:
 # ===================== LEITURA (TRIMESTRE OU MÊS) =====================
 if filtro_mes == "TRIMESTRE":
     try:
-        df_o, df_n, df_d = [ler_planilha(m) for m in ["OUTUBRO", "NOVEMBRO", "DEZEMBRO"]]
-        st.success("✅ Planilhas carregadas com sucesso: OUTUBRO, NOVEMBRO e DEZEMBRO!")
+        df_o, df_n, df_d = [ler_planilha(m) for m in ["JANEIRO", "FEVEREIRO", "MARÇO"]]
+        st.success("✅ Planilhas carregadas com sucesso: JANEIRO, FEVEREIRO e MARÇO!")
     except Exception as e:
         st.error(f"Erro ao ler a planilha: {e}")
         st.stop()
 
     dados_full = pd.concat([
-        calcula_mes(df_o, "OUTUBRO"),
-        calcula_mes(df_n, "NOVEMBRO"),
-        calcula_mes(df_d, "DEZEMBRO")
+        calcula_mes(df_o, "JANEIRO"),
+        calcula_mes(df_n, "FEVEREIRO"),
+        calcula_mes(df_d, "MARÇO")
     ], ignore_index=True)
 
     group_cols = ["CIDADE", "NOME", "FUNÇÃO", "DATA DE ADMISSÃO", "TEMPO DE CASA"]
@@ -567,3 +567,4 @@ for idx, row in dados_view.iterrows():
             st.caption(f"🗒️ {obs_txt}")
         if perdidos_txt and "100%" not in perdidos_txt:
             st.caption(f"🔻 Indicadores não entregues: {perdidos_txt}")
+
