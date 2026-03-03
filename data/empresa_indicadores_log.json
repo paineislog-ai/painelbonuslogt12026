@@ -32,25 +32,25 @@
     "organizacao_da_loja": true,
     "Liderança & Organização": true,
     "producao_por_cidade": {
-      "SÃO LUIS": true,
-      "TIMON": true,
-      "PRESIDENTE DUTRA": true,
-      "AÇAILÂNDIA": true,
-      "CAROLINA": true
+      "SÃO LUIS": false,
+      "TIMON": false,
+      "PRESIDENTE DUTRA": false,
+      "AÇAILÂNDIA": false,
+      "CAROLINA": false
     },
     "qualidade_total_por_cidade": {
-      "SÃO LUIS": 0.035,
-      "AÇAILÂNDIA": 0.035,
-      "TIMON": 0.035,
-      "PRESIDENTE DUTRA": 0.035,
-      "CAROLINA": 0.035
+      "SÃO LUIS": 0.025,
+      "AÇAILÂNDIA": 0.047,
+      "TIMON": 0.045,
+      "PRESIDENTE DUTRA": 0.040,
+      "CAROLINA": 0.061
     },
     "qualidade_gg_por_cidade": {
-      "SÃO LUIS": 0.015,
-      "AÇAILÂNDIA": 0.015,
-      "TIMON": 0.015,
-      "PRESIDENTE DUTRA": 0.015,
-      "CAROLINA": 0.015
+      "SÃO LUIS": 0.014,
+      "AÇAILÂNDIA": 0.021,
+      "TIMON": 0.022,
+      "PRESIDENTE DUTRA": 0.022,
+      "CAROLINA": 0.023
     }
   },
   "MARÇO": {
@@ -80,4 +80,5 @@
       "CAROLINA": 0.015
     }
   }
+
 }
