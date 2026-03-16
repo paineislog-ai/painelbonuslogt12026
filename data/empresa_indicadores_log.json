@@ -34,9 +34,9 @@
     "producao_por_cidade": {
       "SÃO LUIS": false,
       "TIMON": false,
-      "PRESIDENTE DUTRA": false,
+      "PRESIDENTE DUTRA": true,
       "AÇAILÂNDIA": false,
-      "CAROLINA": false
+      "CAROLINA": true
     },
     "qualidade_total_por_cidade": {
       "SÃO LUIS": 0.025,
